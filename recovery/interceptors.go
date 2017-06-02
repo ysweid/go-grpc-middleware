@@ -10,7 +10,7 @@ import (
 )
 
 // RecoveryHandlerFunc is a function that recovers from the panic `p` by returning an `error`.
-type RecoveryHandlerFunc func(p interface{}) (err error)
+type RecoveryHandlerFunc func(ctx context.Context, p interface{}, req interface{}) (err error)
 
 // UnaryServerInterceptor returns a new unary server interceptor for panic recovery.
 func UnaryServerInterceptor(opts ...Option) grpc.UnaryServerInterceptor {
@@ -18,7 +18,7 @@ func UnaryServerInterceptor(opts ...Option) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ interface{}, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = recoverFrom(r, o.recoveryHandlerFunc)
+				err = recoverFrom(r, o.recoveryHandlerFunc, ctx, req)
 			}
 		}()
 
@@ -32,7 +32,7 @@ func StreamServerInterceptor(opts ...Option) grpc.StreamServerInterceptor {
 	return func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = recoverFrom(r, o.recoveryHandlerFunc)
+				err = recoverFrom(r, o.recoveryHandlerFunc, nil, nil)
 			}
 		}()
 
@@ -40,9 +40,9 @@ func StreamServerInterceptor(opts ...Option) grpc.StreamServerInterceptor {
 	}
 }
 
-func recoverFrom(p interface{}, r RecoveryHandlerFunc) error {
+func recoverFrom(p interface{}, r RecoveryHandlerFunc, ctx context.Context, req interface{}) error {
 	if r == nil {
 		return grpc.Errorf(codes.Internal, "%s", p)
 	}
-	return r(p)
+	return r(ctx, p, req)
 }
